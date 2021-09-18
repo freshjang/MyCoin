@@ -254,9 +254,9 @@ class WebsOrderbook(QThread):
 if __name__ == '__main__':
     windowQ, queryQ, tick1Q, tick2Q = Queue(), Queue(), Queue(), Queue()
 
-    Process(target=Query, args=(windowQ, queryQ), daemon=True).start()
-    Process(target=UpdaterTick, args=(tick1Q, queryQ, windowQ), daemon=True).start()
-    Process(target=UpdaterTick, args=(tick2Q, queryQ, windowQ), daemon=True).start()
+    Process(target=Query, args=(windowQ, queryQ)).start()
+    Process(target=UpdaterTick, args=(tick1Q, queryQ, windowQ)).start()
+    Process(target=UpdaterTick, args=(tick2Q, queryQ, windowQ)).start()
 
     app = QtWidgets.QApplication(sys.argv)
     app.setStyle('fusion')
