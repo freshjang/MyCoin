@@ -203,14 +203,11 @@ class WebsTicker(QThread):
             data = websQ_ticker.get()
             int_tick += 1
             ticker = data['code']
-            orderQ.put(['호가업데이트', ticker])
             t = data['trade_time']
-
             try:
                 pret = dict_time[ticker]
             except KeyError:
                 pret = None
-
             if pret is None or t != pret:
                 dict_time[ticker] = t
                 if ticker in self.tickers1:
@@ -235,32 +232,18 @@ class WebsOrderbook(QThread):
 
     def run(self):
         time_info = now()
-        dict_push = {}
         int_tick = 0
         websQ_order = WebSocketManager('orderbook', self.tickers)
         self.data.emit('실시간 데이터 오더북 수신용 웹소켓큐 생성 완료')
 
         while True:
-            if not orderQ.empty():
-                data = orderQ.get()
-                if data[0] == '호가업데이트':
-                    dict_push[data[1]] = True
-
             data = websQ_order.get()
             int_tick += 1
             ticker = data['code']
-
-            try:
-                push = dict_push[ticker]
-            except KeyError:
-                push = False
-
-            if push:
-                if ticker in self.tickers1:
-                    tick1Q.put(data)
-                elif ticker in self.tickers2:
-                    tick2Q.put(data)
-                dict_push[ticker] = False
+            if ticker in self.tickers1:
+                tick1Q.put(data)
+            elif ticker in self.tickers2:
+                tick2Q.put(data)
 
             if now() > time_info:
                 self.data.emit(f'오더북부가정보 {int_tick}')
@@ -269,7 +252,7 @@ class WebsOrderbook(QThread):
 
 
 if __name__ == '__main__':
-    windowQ, orderQ, queryQ, tick1Q, tick2Q = Queue(), Queue(), Queue(), Queue(), Queue()
+    windowQ, queryQ, tick1Q, tick2Q = Queue(), Queue(), Queue(), Queue()
 
     Process(target=Query, args=(windowQ, queryQ), daemon=True).start()
     Process(target=UpdaterTick, args=(tick1Q, queryQ, windowQ), daemon=True).start()
