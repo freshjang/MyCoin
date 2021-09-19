@@ -253,7 +253,7 @@ class Trader(QThread):
             return
 
         if self.dict_intg['예수금'] < c * oc:
-            df = self.df_cj[(self.df_cj['주문구분'] == '시드부족') & (self.df_cj.index == ticker)]
+            df = self.df_cj[(self.df_cj['주문구분'] == '시드부족') & (self.df_cj['종목명'] == ticker)]
             if len(df) == 0 or now() > timedelta_sec(180, strp_time('%Y%m%d%H%M%S%f', df['체결시간'][0])):
                 self.UpdateBuy(ticker, c, oc, strf_time('%Y%m%d%H%M%S'), cancle=True)
             self.CompleteSignal('매수완료', ticker)
@@ -331,13 +331,13 @@ class Trader(QThread):
         order_gubun = '매수' if not cancle else '시드부족'
         self.df_cj.at[dt] = ticker, order_gubun, cc, 0, cp, cp, dt
         self.df_cj.sort_values(by='체결시간', ascending=False, inplace=True)
+        self.data0.emit([ui_num['체결목록'], self.df_cj])
         if not cancle:
             bg = cp * cc
             pg, sg, sp = self.GetPgSgSp(bg, bg)
             self.dict_intg['예수금'] -= bg
             self.df_jg.at[ticker] = ticker, cp, cp, sp, sg, bg, pg, cc
             self.df_jg.sort_values(by=['매입금액'], ascending=False, inplace=True)
-            self.data0.emit([ui_num['체결목록'], self.df_cj])
             self.queryQ.put([self.df_jg, 'jangolist', 'replace'])
             text = f'매매 시스템 체결 알림 - {ticker} {cc}코인 매수'
             self.log.info(f'[{now()}] {text}')
