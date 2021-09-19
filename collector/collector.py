@@ -51,13 +51,27 @@ class UpdaterTick:
             else:
                 self.UpdateOrderbook(data)
 
-    def UpdateTickData(self, data, receiv_time):
-        ticker = data['code']
+    def UpdateTickData(self, data_, receiv_time):
+        ticker = data_['code']
+        dt = data_['trade_date'] + data_['trade_time']
         if ticker not in self.dict_orderbook.keys():
             return
 
+        data = {
+            '현재가': data_['trade_price'],
+            '시가': data_['opening_price'],
+            '고가': data_['high_price'],
+            '저가': data_['low_price'],
+            '전일종가': data_['prev_closing_price'],
+            '등락율': data_['signed_change_rate'],
+            '누적거래량': data_['acc_trade_volume'],
+            '누적거래대금': data_['acc_trade_price'],
+            '누적매수량': data_['acc_bid_volume'],
+            '누적매도량': data_['acc_ask_volume'],
+            '52주최고가': data_['highest_52_week_price'],
+            '52주최저가': data_['lowest_52_week_price']
+        }
         data.update(self.dict_orderbook[ticker])
-        dt = data['trade_date'] + data['trade_time']
 
         if ticker not in self.dict_df.keys():
             self.dict_df[ticker] = pd.DataFrame(data, index=[dt])
@@ -74,48 +88,48 @@ class UpdaterTick:
     def UpdateOrderbook(self, data):
         ticker = data['code']
         self.dict_orderbook[ticker] = {
-            'total_ask_size': data['total_ask_size'],
-            'total_bid_size': data['total_bid_size'],
-            'ask_price_10': data['orderbook_units'][9]['ask_price'],
-            'ask_price_9': data['orderbook_units'][8]['ask_price'],
-            'ask_price_8': data['orderbook_units'][7]['ask_price'],
-            'ask_price_7': data['orderbook_units'][6]['ask_price'],
-            'ask_price_6': data['orderbook_units'][5]['ask_price'],
-            'ask_price_5': data['orderbook_units'][4]['ask_price'],
-            'ask_price_4': data['orderbook_units'][3]['ask_price'],
-            'ask_price_3': data['orderbook_units'][2]['ask_price'],
-            'ask_price_2': data['orderbook_units'][1]['ask_price'],
-            'ask_price_1': data['orderbook_units'][0]['ask_price'],
-            'bid_price_1': data['orderbook_units'][0]['bid_price'],
-            'bid_price_2': data['orderbook_units'][1]['bid_price'],
-            'bid_price_3': data['orderbook_units'][2]['bid_price'],
-            'bid_price_4': data['orderbook_units'][3]['bid_price'],
-            'bid_price_5': data['orderbook_units'][4]['bid_price'],
-            'bid_price_6': data['orderbook_units'][5]['bid_price'],
-            'bid_price_7': data['orderbook_units'][6]['bid_price'],
-            'bid_price_8': data['orderbook_units'][7]['bid_price'],
-            'bid_price_9': data['orderbook_units'][8]['bid_price'],
-            'bid_price_10': data['orderbook_units'][9]['bid_price'],
-            'ask_size_10': data['orderbook_units'][9]['ask_size'],
-            'ask_size_9': data['orderbook_units'][8]['ask_size'],
-            'ask_size_8': data['orderbook_units'][7]['ask_size'],
-            'ask_size_7': data['orderbook_units'][6]['ask_size'],
-            'ask_size_6': data['orderbook_units'][5]['ask_size'],
-            'ask_size_5': data['orderbook_units'][4]['ask_size'],
-            'ask_size_4': data['orderbook_units'][3]['ask_size'],
-            'ask_size_3': data['orderbook_units'][2]['ask_size'],
-            'ask_size_2': data['orderbook_units'][1]['ask_size'],
-            'ask_size_1': data['orderbook_units'][0]['ask_size'],
-            'bid_size_1': data['orderbook_units'][0]['bid_size'],
-            'bid_size_2': data['orderbook_units'][1]['bid_size'],
-            'bid_size_3': data['orderbook_units'][2]['bid_size'],
-            'bid_size_4': data['orderbook_units'][3]['bid_size'],
-            'bid_size_5': data['orderbook_units'][4]['bid_size'],
-            'bid_size_6': data['orderbook_units'][5]['bid_size'],
-            'bid_size_7': data['orderbook_units'][6]['bid_size'],
-            'bid_size_8': data['orderbook_units'][7]['bid_size'],
-            'bid_size_9': data['orderbook_units'][8]['bid_size'],
-            'bid_size_10': data['orderbook_units'][9]['bid_size']
+            '총매도잔량': data['total_ask_size'],
+            '총매수잔량': data['total_bid_size'],
+            '매도호가10': data['orderbook_units'][9]['ask_price'],
+            '매도호가9': data['orderbook_units'][8]['ask_price'],
+            '매도호가8': data['orderbook_units'][7]['ask_price'],
+            '매도호가7': data['orderbook_units'][6]['ask_price'],
+            '매도호가6': data['orderbook_units'][5]['ask_price'],
+            '매도호가5': data['orderbook_units'][4]['ask_price'],
+            '매도호가4': data['orderbook_units'][3]['ask_price'],
+            '매도호가3': data['orderbook_units'][2]['ask_price'],
+            '매도호가2': data['orderbook_units'][1]['ask_price'],
+            '매도호가1': data['orderbook_units'][0]['ask_price'],
+            '매수호가1': data['orderbook_units'][0]['bid_price'],
+            '매수호가2': data['orderbook_units'][1]['bid_price'],
+            '매수호가3': data['orderbook_units'][2]['bid_price'],
+            '매수호가4': data['orderbook_units'][3]['bid_price'],
+            '매수호가5': data['orderbook_units'][4]['bid_price'],
+            '매수호가6': data['orderbook_units'][5]['bid_price'],
+            '매수호가7': data['orderbook_units'][6]['bid_price'],
+            '매수호가8': data['orderbook_units'][7]['bid_price'],
+            '매수호가9': data['orderbook_units'][8]['bid_price'],
+            '매수호가10': data['orderbook_units'][9]['bid_price'],
+            '매도잔량10': data['orderbook_units'][9]['ask_size'],
+            '매도잔량9': data['orderbook_units'][8]['ask_size'],
+            '매도잔량8': data['orderbook_units'][7]['ask_size'],
+            '매도잔량7': data['orderbook_units'][6]['ask_size'],
+            '매도잔량6': data['orderbook_units'][5]['ask_size'],
+            '매도잔량5': data['orderbook_units'][4]['ask_size'],
+            '매도잔량4': data['orderbook_units'][3]['ask_size'],
+            '매도잔량3': data['orderbook_units'][2]['ask_size'],
+            '매도잔량2': data['orderbook_units'][1]['ask_size'],
+            '매도잔량1': data['orderbook_units'][0]['ask_size'],
+            '매수잔량1': data['orderbook_units'][0]['bid_size'],
+            '매수잔량2': data['orderbook_units'][1]['bid_size'],
+            '매수잔량3': data['orderbook_units'][2]['bid_size'],
+            '매수잔량4': data['orderbook_units'][3]['bid_size'],
+            '매수잔량5': data['orderbook_units'][4]['bid_size'],
+            '매수잔량6': data['orderbook_units'][5]['bid_size'],
+            '매수잔량7': data['orderbook_units'][6]['bid_size'],
+            '매수잔량8': data['orderbook_units'][7]['bid_size'],
+            '매수잔량9': data['orderbook_units'][8]['bid_size'],
+            '매수잔량10': data['orderbook_units'][9]['bid_size']
         }
 
 
