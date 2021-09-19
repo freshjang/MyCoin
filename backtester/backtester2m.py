@@ -174,7 +174,7 @@ class BackTester1m:
                         plus_per, self.totalper, self.totaleyun])
             ticker, totalcount, avgholdday, totalcount_p, totalcount_m, plus_per, totalper, totaleyun = \
                 self.GetTotal(plus_per, avgholdday)
-            print(f" 종목코드 {self.ticker} | 평균보유기간 {avgholdday}초 | 거래횟수 {totalcount}회 | "
+            print(f" 종목코드 {ticker} | 평균보유기간 {avgholdday}초 | 거래횟수 {totalcount}회 | "
                   f" 익절 {totalcount_p}회 | 손절 {totalcount_m}회 | 승률 {plus_per}% |"
                   f" 수익률 {totalper}% | 수익금 {totaleyun}원 [{count}/{tcount}]")
         else:
