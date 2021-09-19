@@ -14,9 +14,9 @@ TOTALTIME = 36000       # 백테스팅 기간 동안 9시부터 10시까지의 �
 
 
 class BackTester1:
-    def __init__(self, q_, code_list_, num_, high):
+    def __init__(self, q_, ticker_list_, num_, high):
         self.q = q_
-        self.code_list = code_list_
+        self.ticker_list = ticker_list_
         self.high = high
 
         if type(num_[0]) == list:
@@ -38,7 +38,7 @@ class BackTester1:
             self.per_high = num_[6]
             self.cs_per = num_[7]
 
-        self.code = None
+        self.ticker = None
         self.df = None
 
         self.totalcount = 0
@@ -61,11 +61,11 @@ class BackTester1:
 
     def Start(self):
         conn = sqlite3.connect(db_tick)
-        tcount = len(self.code_list)
+        tcount = len(self.ticker_list)
         int_daylimit = int(strf_time('%Y%m%d', timedelta_day(-TESTPERIOD)))
-        for k, code in enumerate(self.code_list):
-            self.code = code
-            self.df = pd.read_sql(f"SELECT * FROM '{code}'", conn)
+        for k, ticker in enumerate(self.ticker_list):
+            self.ticker = ticker
+            self.df = pd.read_sql(f"SELECT * FROM '{ticker}'", conn)
             self.df = self.df.set_index('index')
             self.df['고저평균대비등락율'] = (self.df['현재가'] / ((self.df['고가'] + self.df['저가']) / 2) - 1) * 100
             self.df['고저평균대비등락율'] = self.df['고저평균대비등락율'].round(2)
@@ -163,7 +163,7 @@ class BackTester1:
         else:
             self.totalcount_m += 1
         if self.high:
-            self.q.put([self.index, self.code, per, eyun])
+            self.q.put([self.index, self.ticker, per, eyun])
 
     # noinspection PyMethodMayBeStatic
     def GetEyunPer(self, bg, cg):
@@ -182,17 +182,22 @@ class BackTester1:
         if self.totalcount > 0:
             plus_per = round((self.totalcount_p / self.totalcount) * 100, 2)
             avgholdday = round(self.totalholdday / self.totalcount, 2)
-            self.q.put([self.code, self.totalcount, avgholdday, self.totalcount_p, self.totalcount_m,
+            self.q.put([self.ticker, self.totalcount, avgholdday, self.totalcount_p, self.totalcount_m,
                         plus_per, self.totalper, self.totaleyun])
-            totalcount, avgholdday, totalcount_p, totalcount_m, plus_per, totalper, totaleyun = \
+            ticker, totalcount, avgholdday, totalcount_p, totalcount_m, plus_per, totalper, totaleyun = \
                 self.GetTotal(plus_per, avgholdday)
-            print(f" 종목코드 {self.code} | 평균보유기간 {avgholdday}초 | 거래횟수 {totalcount}회 | "
+            print(f" 종목코드 {self.ticker} | 평균보유기간 {avgholdday}초 | 거래횟수 {totalcount}회 | "
                   f" 익절 {totalcount_p}회 | 손절 {totalcount_m}회 | 승률 {plus_per}% |"
                   f" 수익률 {totalper}% | 수익금 {totaleyun}원 [{count}/{tcount}]")
         else:
-            self.q.put([self.code, 0, 0, 0, 0, 0., 0., 0])
+            self.q.put([self.ticker, 0, 0, 0, 0, 0., 0., 0])
 
     def GetTotal(self, plus_per, avgholdday):
+        ticker = str(self.ticker)
+        ticker = ticker + '    ' if len(ticker) == 6 else ticker
+        ticker = ticker + '   ' if len(ticker) == 7 else ticker
+        ticker = ticker + '  ' if len(ticker) == 8 else ticker
+        ticker = ticker + ' ' if len(ticker) == 9 else ticker
         totalcount = str(self.totalcount)
         totalcount = '  ' + totalcount if len(totalcount) == 1 else totalcount
         totalcount = ' ' + totalcount if len(totalcount) == 2 else totalcount
@@ -229,7 +234,7 @@ class BackTester1:
             totaleyun = '  ' + totaleyun if len(totaleyun.split(',')[0]) == 4 else totaleyun
         elif len(totaleyun.split(',')) == 3:
             totaleyun = ' ' + totaleyun if len(totaleyun.split(',')[0]) == 1 else totaleyun
-        return totalcount, avgholdday, totalcount_p, totalcount_m, plus_per, totalper, totaleyun
+        return ticker, totalcount, avgholdday, totalcount_p, totalcount_m, plus_per, totalper, totaleyun
 
 
 class Total:
@@ -359,8 +364,8 @@ if __name__ == "__main__":
             procs = []
             workcount = int(last / 6) + 1
             for j in range(0, last, workcount):
-                code_list = table_list[j:j + workcount]
-                p = Process(target=BackTester1, args=(q, code_list, num, False))
+                ticker_list = table_list[j:j + workcount]
+                p = Process(target=BackTester1, args=(q, ticker_list, num, False))
                 procs.append(p)
                 p.start()
             for p in procs:
@@ -392,8 +397,8 @@ if __name__ == "__main__":
         procs = []
         workcount = int(last / 6) + 1
         for j in range(0, last, workcount):
-            code_list = table_list[j:j + workcount]
-            p = Process(target=BackTester1, args=(q, code_list, num, False))
+            ticker_list = table_list[j:j + workcount]
+            p = Process(target=BackTester1, args=(q, ticker_list, num, False))
             procs.append(p)
             p.start()
         for p in procs:
