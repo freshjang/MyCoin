@@ -63,7 +63,7 @@ class UpdaterTick:
             '고가': data_['high_price'],
             '저가': data_['low_price'],
             '전일종가': data_['prev_closing_price'],
-            '등락율': data_['signed_change_rate'],
+            '등락율': round(data_['signed_change_rate'] * 100, 2),
             '누적거래량': data_['acc_trade_volume'],
             '누적거래대금': data_['acc_trade_price'],
             '누적매수량': data_['acc_bid_volume'],

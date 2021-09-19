@@ -352,9 +352,9 @@ class Window(QtWidgets.QMainWindow):
         if data[0] == 0:
             self.info_label.setText(data[1])
         elif data[0] == 1:
-            memory = round(self.info1[0] + self.info2[0] + self.info3[0] + self.info4[0], 2)
-            thread = self.info1[1] + self.info2[1] + self.info3[1] + self.info4[1]
-            cpu = round(self.info1[2] + self.info2[2] + self.info3[2] + self.info4[2], 2)
+            memory = round(self.info1[0] + self.info2[0], 2)
+            thread = self.info1[1] + self.info2[1]
+            cpu = round(self.info1[2] + self.info2[2], 2)
             text = f'Total Process - Memory {memory}MB | Thread {thread}EA | CPU {cpu}%'
             self.info_label.setText(text)
             self.GetInfo()
@@ -457,14 +457,17 @@ class Writer(QThread):
         while True:
             data = self.windowQ.get()
             if len(data) == 2:
-                if type(data[1]) == pd.DataFrame and data[0] != ui_num['단타설정']:
-                    self.data0.emit([data[0], data[1]])
-                elif data[0] == ui_num['단타설정']:
-                    self.data1.emit([data[0], data[1]])
-                elif data[0] == ui_num['관심종목']:
-                    self.data1.emit([data[0], data[1]])
+                if type(data[1]) == pd.DataFrame:
+                    if data[0] != ui_num['단타설정']:
+                        self.data0.emit(data)
+                    else:
+                        self.data1.emit(data)
+                elif type(data[1]) == dict:
+                    self.data1.emit(data)
+                elif type(data[1]) == str:
+                    self.data2.emit(data)
             elif len(data) == 4:
-                self.data2.emit([data[0], data[1], data[2], data[3]])
+                self.data2.emit(data)
 
 
 if __name__ == '__main__':
