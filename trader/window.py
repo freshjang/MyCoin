@@ -3,9 +3,9 @@ import sys
 import psutil
 import sqlite3
 import pandas as pd
-from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPalette
 from PyQt5 import QtCore, QtWidgets
+from PyQt5.QtCore import Qt, QThread
 from multiprocessing import Queue, Process
 from trader import Trader
 from strategy import Strategy
@@ -13,7 +13,7 @@ sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from utility.query import Query
 from utility.sound import Sound
 from utility.setting import *
-from utility.static import strf_time, thread_decorator, strp_time
+from utility.static import strf_time, thread_decorator, strp_time, timedelta_hour
 
 
 class Window(QtWidgets.QMainWindow):
@@ -44,15 +44,14 @@ class Window(QtWidgets.QMainWindow):
             tableWidget.setHorizontalHeaderLabels(columns)
             if columns[0] == 'ticker':
                 tableWidget.setColumnWidth(0, 85)
-                tableWidget.setColumnWidth(1, 80)
-                tableWidget.setColumnWidth(2, 53)
-                tableWidget.setColumnWidth(3, 53)
-                tableWidget.setColumnWidth(4, 70)
-                tableWidget.setColumnWidth(5, 70)
-                tableWidget.setColumnWidth(6, 96)
-                tableWidget.setColumnWidth(7, 53)
-                tableWidget.setColumnWidth(8, 53)
-                tableWidget.setColumnWidth(9, 53)
+                tableWidget.setColumnWidth(1, 55)
+                tableWidget.setColumnWidth(2, 55)
+                tableWidget.setColumnWidth(3, 90)
+                tableWidget.setColumnWidth(4, 126)
+                tableWidget.setColumnWidth(5, 55)
+                tableWidget.setColumnWidth(6, 90)
+                tableWidget.setColumnWidth(7, 55)
+                tableWidget.setColumnWidth(8, 55)
             elif colcount >= 7:
                 tableWidget.setColumnWidth(0, 126)
                 tableWidget.setColumnWidth(1, 90)
@@ -79,8 +78,7 @@ class Window(QtWidgets.QMainWindow):
         self.tj_tableWidget = setTablewidget(self.td_tab, columns_tj, len(columns_tj), 1)
         self.jg_tableWidget = setTablewidget(self.td_tab, columns_jg, len(columns_jg), 17)
         self.cj_tableWidget = setTablewidget(self.td_tab, columns_cj, len(columns_cj), 17)
-
-        self.gj_tableWidget = setTablewidget(self.gj_tab, columns_gj2, len(columns_gj2), 56)
+        self.gj_tableWidget = setTablewidget(self.gj_tab, columns_gj3, len(columns_gj3), 56)
 
         self.st_groupBox = QtWidgets.QGroupBox(self.st_tab)
         self.calendarWidget = QtWidgets.QCalendarWidget(self.st_groupBox)
@@ -128,20 +126,68 @@ class Window(QtWidgets.QMainWindow):
         self.sgt_tableWidget.setGeometry(5, 57, 668, 42)
         self.sgl_tableWidget.setGeometry(5, 104, 668, 1252)
 
+        self.dict_intg = {
+            '체결강도차이1': 0.,
+            '평균시간1': 0,
+            '거래대금차이1': 0,
+            '체결강도하한1': 0.,
+            '누적거래대금하한1': 0,
+            '등락율하한1': 0.,
+            '등락율상한1': 0.,
+            '청산수익률1': 0.,
+
+            '체결강도차이2': 0.,
+            '평균시간2': 0,
+            '거래대금차이2': 0,
+            '체결강도하한2': 0.,
+            '누적거래대금하한2': 0,
+            '등락율하한2': 0.,
+            '등락율상한2': 0.,
+            '청산수익률2': 0.
+        }
+
         self.info1 = [0., 0, 0.]
         self.info2 = [0., 0, 0.]
-        self.info3 = [0., 0, 0.]
-        self.info4 = [0., 0, 0.]
-        self.info5 = [0., 0, 0.]
 
-        self.worker = Trader(windowQ, workerQ, queryQ, soundQ, stg1Q, stg2Q, stg3Q, stg4Q)
-        self.worker.data0.connect(self.UpdateTablewidget)
-        self.worker.data1.connect(self.UpdateGoansimjongmok)
-        self.worker.data2.connect(self.UpdateInfo)
+        self.worker = Trader(windowQ, workerQ, queryQ, soundQ, stgQ)
         self.worker.start()
 
+        self.writer = Writer()
+        self.writer.data0.connect(self.UpdateTablewidget)
+        self.writer.data1.connect(self.UpdateGoansimjongmok)
+        self.writer.data2.connect(self.UpdateInfo)
+        self.writer.start()
+
     def UpdateGoansimjongmok(self, data):
-        gsjm = data[1]
+        gubun = data[0]
+        dict_df = data[1]
+
+        if gubun == ui_num['단타설정']:
+            df = data[1]
+            self.dict_intg['체결강도차이1'] = df['체결강도차이1'][0]
+            self.dict_intg['평균시간1'] = df['평균시간1'][0]
+            self.dict_intg['거래대금차이1'] = df['거래대금차이1'][0]
+            self.dict_intg['체결강도하한1'] = df['체결강도하한1'][0]
+            self.dict_intg['누적거래대금하한1'] = df['누적거래대금하한1'][0]
+            self.dict_intg['등락율하한1'] = df['등락율하한1'][0]
+            self.dict_intg['등락율상한1'] = df['등락율상한1'][0]
+            self.dict_intg['청산수익률1'] = df['청산수익률1'][0]
+            self.dict_intg['체결강도차이2'] = df['체결강도차이2'][0]
+            self.dict_intg['평균시간2'] = df['평균시간2'][0]
+            self.dict_intg['거래대금차이2'] = df['거래대금차이2'][0]
+            self.dict_intg['체결강도하한2'] = df['체결강도하한2'][0]
+            self.dict_intg['누적거래대금하한2'] = df['누적거래대금하한2'][0]
+            self.dict_intg['등락율하한2'] = df['등락율하한2'][0]
+            self.dict_intg['등락율상한2'] = df['등락율상한2'][0]
+            self.dict_intg['청산수익률2'] = df['청산수익률2'][0]
+            return
+
+        if gubun == ui_num['관심종목'] and self.table_tabWidget.currentWidget() != self.gj_tab:
+            return
+
+        if len(dict_df) == 0:
+            self.gj_tableWidget.clearContents()
+            return
 
         def changeFormat(text):
             text = str(text)
@@ -154,42 +200,64 @@ class Window(QtWidgets.QMainWindow):
                         format_data += '0'
             return format_data
 
-        tableWidget = self.gj_tableWidget
-        if len(gsjm) == 0:
-            tableWidget.clearContents()
-            return
-
-        tableWidget.setRowCount(len(gsjm))
-        for j, ticker in enumerate(list(gsjm.keys())):
+        self.gj_tableWidget.setRowCount(len(dict_df))
+        time = 1 if 90000 < int(strf_time('%H%M%S', timedelta_hour(-9))) <= 1000000 else 2
+        for j, ticker in enumerate(list(dict_df.keys())):
             item = QtWidgets.QTableWidgetItem(ticker)
             item.setTextAlignment(Qt.AlignVCenter | Qt.AlignLeft)
-            tableWidget.setItem(j, 0, item)
-            for i, column in enumerate(columns_gj2):
-                if i < 1:
-                    continue
-                if column == 'c':
-                    item = QtWidgets.QTableWidgetItem(changeFormat(gsjm[ticker]['현재가'][0]).split('.')[0])
-                elif column == 'per':
-                    item = QtWidgets.QTableWidgetItem(changeFormat(gsjm[ticker]['등락율'][0]))
-                elif column == 'hlmp':
-                    item = QtWidgets.QTableWidgetItem(changeFormat(gsjm[ticker]['고저평균대비등락율'][0]))
-                elif column == 'sm':
-                    item = QtWidgets.QTableWidgetItem(changeFormat(gsjm[ticker]['거래대금'][0]).split('.')[0])
-                elif column == 'avg_sm':
-                    item = QtWidgets.QTableWidgetItem(changeFormat(gsjm[ticker]['거래대금'][31]).split('.')[0])
-                elif column == 'dm':
-                    item = QtWidgets.QTableWidgetItem(changeFormat(gsjm[ticker]['누적거래대금'][0]).split('.')[0])
-                elif column == 'ch':
-                    item = QtWidgets.QTableWidgetItem(changeFormat(gsjm[ticker]['체결강도'][0]))
-                elif column == 'avg_ch':
-                    item = QtWidgets.QTableWidgetItem(changeFormat(gsjm[ticker]['체결강도'][31]))
-                elif column == 'hch':
-                    item = QtWidgets.QTableWidgetItem(changeFormat(gsjm[ticker]['최고체결강도'][31]))
-                item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
-                tableWidget.setItem(j, i, item)
+            self.gj_tableWidget.setItem(j, 0, item)
 
-        if len(gsjm) < 57:
-            tableWidget.setRowCount(57)
+            smavg = dict_df[ticker]['거래대금'][self.dict_intg[f'평균시간{time}'] + 1]
+            item = QtWidgets.QTableWidgetItem(changeFormat(smavg).split('.')[0])
+            item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
+            self.gj_tableWidget.setItem(j, columns_gj3.index('smavg'), item)
+
+            chavg = dict_df[ticker]['체결강도'][self.dict_intg[f'평균시간{time}'] + 1]
+            item = QtWidgets.QTableWidgetItem(changeFormat(chavg))
+            item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
+            self.gj_tableWidget.setItem(j, columns_gj3.index('chavg'), item)
+
+            chhigh = dict_df[ticker]['최고체결강도'][self.dict_intg[f'평균시간{time}'] + 1]
+            item = QtWidgets.QTableWidgetItem(changeFormat(chhigh))
+            item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
+            self.gj_tableWidget.setItem(j, columns_gj3.index('chhigh'), item)
+
+            for i, column in enumerate(columns_gj2):
+                if column in ['거래대금', '누적거래대금']:
+                    item = QtWidgets.QTableWidgetItem(changeFormat(dict_df[ticker][column][0]).split('.')[0])
+                else:
+                    item = QtWidgets.QTableWidgetItem(changeFormat(dict_df[ticker][column][0]))
+                item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
+                if column == '등락율':
+                    if self.dict_intg[f'등락율하한{time}'] <= dict_df[ticker][column][0] <= self.dict_intg[f'등락율상한{time}']:
+                        item.setForeground(color_fg_bt)
+                    else:
+                        item.setForeground(color_fg_dk)
+                elif column == '고저평균대비등락율':
+                    if dict_df[ticker][column][0] >= 0:
+                        item.setForeground(color_fg_bt)
+                    else:
+                        item.setForeground(color_fg_dk)
+                elif column == '거래대금':
+                    if dict_df[ticker][column][0] >= smavg + self.dict_intg[f'거래대금차이{time}']:
+                        item.setForeground(color_fg_bt)
+                    else:
+                        item.setForeground(color_fg_dk)
+                elif column == '누적거래대금':
+                    if dict_df[ticker][column][0] >= self.dict_intg[f'누적거래대금하한{time}']:
+                        item.setForeground(color_fg_bt)
+                    else:
+                        item.setForeground(color_fg_dk)
+                elif column == '체결강도':
+                    if dict_df[ticker][column][0] >= self.dict_intg[f'체결강도하한{time}'] and \
+                            dict_df[ticker][column][0] >= chavg + self.dict_intg[f'체결강도차이{time}']:
+                        item.setForeground(color_fg_bt)
+                    else:
+                        item.setForeground(color_fg_dk)
+                self.gj_tableWidget.setItem(j, i + 1, item)
+
+        if len(dict_df) < 57:
+            self.gj_tableWidget.setRowCount(57)
 
     def UpdateTablewidget(self, data):
         gubun = data[0]
@@ -292,12 +360,6 @@ class Window(QtWidgets.QMainWindow):
             self.GetInfo()
         elif data[0] == 2:
             self.info2 = [data[1], data[2], data[3]]
-        elif data[0] == 3:
-            self.info3 = [data[1], data[2], data[3]]
-        elif data[0] == 4:
-            self.info4 = [data[1], data[2], data[3]]
-        elif data[0] == 5:
-            self.info5 = [data[1], data[2], data[3]]
 
     @thread_decorator
     def GetInfo(self):
@@ -382,15 +444,34 @@ class Window(QtWidgets.QMainWindow):
                 self.UpdateTablewidget([ui_num['누적상세'], df2])
 
 
+class Writer(QThread):
+    data0 = QtCore.pyqtSignal(list)
+    data1 = QtCore.pyqtSignal(list)
+    data2 = QtCore.pyqtSignal(list)
+
+    def __init__(self):
+        super().__init__()
+        self.windowQ = windowQ
+
+    def run(self):
+        while True:
+            data = self.windowQ.get()
+            if len(data) == 2:
+                if type(data[1]) == pd.DataFrame and data[0] != ui_num['단타설정']:
+                    self.data0.emit([data[0], data[1]])
+                elif data[0] == ui_num['단타설정']:
+                    self.data1.emit([data[0], data[1]])
+                elif data[0] == ui_num['관심종목']:
+                    self.data1.emit([data[0], data[1]])
+            elif len(data) == 4:
+                self.data2.emit([data[0], data[1], data[2], data[3]])
+
+
 if __name__ == '__main__':
-    windowQ, workerQ, queryQ, soundQ, stg1Q, stg2Q, stg3Q, stg4Q = \
-        Queue(), Queue(), Queue(), Queue(), Queue(), Queue(), Queue(), Queue()
+    windowQ, workerQ, queryQ, soundQ, stgQ = Queue(), Queue(), Queue(), Queue(), Queue()
     Process(target=Query, args=(queryQ,)).start()
     Process(target=Sound, args=(soundQ,)).start()
-    Process(target=Strategy, args=(2, windowQ, workerQ, queryQ, stg1Q)).start()
-    Process(target=Strategy, args=(3, windowQ, workerQ, queryQ, stg2Q)).start()
-    Process(target=Strategy, args=(4, windowQ, workerQ, queryQ, stg3Q)).start()
-    Process(target=Strategy, args=(5, windowQ, workerQ, queryQ, stg4Q)).start()
+    Process(target=Strategy, args=(windowQ, workerQ, queryQ, stgQ)).start()
     app = QtWidgets.QApplication(sys.argv)
     app.setStyle('fusion')
     palette = QPalette()
