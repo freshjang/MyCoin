@@ -10,8 +10,7 @@ from utility.static import now, timedelta_sec, thread_decorator, strf_time, time
 
 
 class Strategy:
-    def __init__(self, gubun, windowQ, workerQ, queryQ, stgQ):
-        self.gubun = gubun
+    def __init__(self, windowQ, workerQ, queryQ, stgQ):
         self.windowQ = windowQ
         self.workerQ = workerQ
         self.queryQ = queryQ
@@ -55,6 +54,7 @@ class Strategy:
         con = sqlite3.connect(db_stg)
         df = pd.read_sql('SELECT * FROM setting', con)
         df = df.set_index('index')
+        self.windowQ.put([ui_num['단타설정'], df])
         self.dict_intg['체결강도차이1'] = df['체결강도차이1'][0]
         self.dict_intg['평균시간1'] = df['평균시간1'][0]
         self.dict_intg['거래대금차이1'] = df['거래대금차이1'][0]
@@ -95,21 +95,22 @@ class Strategy:
             for ticker in tickers:
                 data = np.zeros((self.dict_intg['평균시간2'] + 2, len(columns_gj1))).tolist()
                 df = pd.DataFrame(data, columns=columns_gj1)
-                df['체결시간'] = '000000'
+                df['체결시간'] = strf_time('%H%M%S', timedelta_hour(-9))
                 self.dict_gsjm[ticker] = df.copy()
+            self.windowQ.put([ui_num['관심종목'] + 100, self.dict_gsjm])
         elif '장초단타전략시작' in gubun:
             data = np.zeros((self.dict_intg['평균시간1'] + 2, len(columns_gj1))).tolist()
             df = pd.DataFrame(data, columns=columns_gj1)
             df['체결시간'] = '090000'
-            for code in self.dict_gsjm.keys():
-                self.dict_gsjm[code] = df.copy()
+            for ticker in list(self.dict_gsjm.keys()):
+                self.dict_gsjm[ticker] = df.copy()
             self.windowQ.put([ui_num['관심종목'] + 100, self.dict_gsjm])
         elif '장중단타전략시작' in gubun:
             data = np.zeros((self.dict_intg['평균시간2'] + 2, len(columns_gj1))).tolist()
             df = pd.DataFrame(data, columns=columns_gj1)
             df['체결시간'] = '100000'
-            for code in self.dict_gsjm.keys():
-                self.dict_gsjm[code] = df.copy()
+            for ticker in list(self.dict_gsjm.keys()):
+                self.dict_gsjm[ticker] = df.copy()
             self.windowQ.put([ui_num['관심종목'] + 100, self.dict_gsjm])
         elif gubun == '매수완료':
             if tickers in self.list_buy:
@@ -122,7 +123,7 @@ class Strategy:
         if ticker not in self.dict_gsjm.keys():
             return
 
-        time = 1 if int(strf_time('%H%M%S', timedelta_hour(-9))) <= 100000 else 2
+        time = 1 if 90000 < int(strf_time('%H%M%S', timedelta_hour(-9))) <= 1000000 else 2
         hlm = round((h + low) / 2)
         hlmp = round((c / hlm - 1) * 100, 2)
         predm = self.dict_gsjm[ticker]['누적거래대금'][1]
@@ -134,7 +135,7 @@ class Strategy:
         self.dict_gsjm[ticker] = self.dict_gsjm[ticker].shift(1)
         if len(self.dict_gsjm[ticker]) == self.dict_intg[f'평균시간{time}'] + 2 and \
                 self.dict_gsjm[ticker]['체결강도'][self.dict_intg[f'평균시간{time}']] != 0.:
-            avg_sm = round(self.dict_gsjm[ticker]['거래대금'][1:self.dict_intg[f'평균시간{time}'] + 1].mean(), 2)
+            avg_sm = int(self.dict_gsjm[ticker]['거래대금'][1:self.dict_intg[f'평균시간{time}'] + 1].mean())
             avg_ch = round(self.dict_gsjm[ticker]['체결강도'][1:self.dict_intg[f'평균시간{time}'] + 1].mean(), 2)
             high_ch = round(self.dict_gsjm[ticker]['체결강도'][1:self.dict_intg[f'평균시간{time}'] + 1].max(), 2)
             self.dict_gsjm[ticker].at[self.dict_intg[f'평균시간{time}'] + 1] = 0., 0., avg_sm, 0, avg_ch, high_ch, t
@@ -162,7 +163,7 @@ class Strategy:
 
         oc = 0
 
-        time = 1 if int(strf_time('%H%M%S', timedelta_hour(-9))) <= 100000 else 2
+        time = 1 if 90000 < int(strf_time('%H%M%S', timedelta_hour(-9))) <= 1000000 else 2
 
         # 전략 비공개
 
@@ -172,7 +173,7 @@ class Strategy:
 
     @thread_decorator
     def UpdateInfo(self):
-        info = [self.gubun, self.dict_intg['메모리'], self.dict_intg['스레드'], self.dict_intg['시피유']]
+        info = [2, self.dict_intg['메모리'], self.dict_intg['스레드'], self.dict_intg['시피유']]
         self.windowQ.put(info)
         self.UpdateSysinfo()
 
