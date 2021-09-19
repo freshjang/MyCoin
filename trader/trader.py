@@ -171,6 +171,11 @@ class Trader(QThread):
                     ch = round(bid / ask * 100, 2)
                     self.UpdateJango(ticker, c, ch)
 
+            """
+            전략은 9시~10시 장초단타전략과 이외의 시간 장중단타전략 두가지로 운영한다.
+            전략의 시간이 변경될 때 현재 잔고를 모두 청산하고
+            전략 연산 프로세스의 관심종목용 딕셔너리를 초기화하는 명령을 보낸다.  
+            """
             if self.int_ctime <= 90000 < int(t) and not self.dict_bool['장중단타전략중단']:
                 self.dict_bool['장중단타전략중단'] = True
                 self.dict_bool['장초단타전략중단'] = False
@@ -183,6 +188,7 @@ class Trader(QThread):
                 self.JangoCheongsan()
                 self.stgQ.put(['장중단타전략시작', ''])
 
+            """ 전략 운영 시간 기록용 """
             if int(t) != self.int_ctime:
                 self.int_ctime = int(t)
 
