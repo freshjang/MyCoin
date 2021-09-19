@@ -92,8 +92,9 @@ class Strategy:
     def UpdateList(self, gubun, tickers):
         if '관심종목초기화' in gubun:
             self.dict_gsjm = {}
+            time = 1 if 90000 < int(strf_time('%H%M%S', timedelta_hour(-9))) <= 1000000 else 2
             for ticker in tickers:
-                data = np.zeros((self.dict_intg['평균시간2'] + 2, len(columns_gj1))).tolist()
+                data = np.zeros((self.dict_intg[f'평균시간{time}'] + 2, len(columns_gj1))).tolist()
                 df = pd.DataFrame(data, columns=columns_gj1)
                 df['체결시간'] = strf_time('%H%M%S', timedelta_hour(-9))
                 self.dict_gsjm[ticker] = df.copy()
