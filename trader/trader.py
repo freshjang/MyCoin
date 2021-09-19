@@ -5,7 +5,6 @@ import logging
 import sqlite3
 import pyupbit
 import pandas as pd
-from PyQt5 import QtCore
 from PyQt5.QtCore import QThread
 from pyupbit import WebSocketManager
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
@@ -14,11 +13,7 @@ from utility.static import now, timedelta_sec, strf_time, telegram_msg, timedelt
 
 
 class Trader(QThread):
-    data0 = QtCore.pyqtSignal(list)
-    data1 = QtCore.pyqtSignal(list)
-    data2 = QtCore.pyqtSignal(list)
-
-    def __init__(self, windowQ, workerQ, queryQ, soundQ, stg1Q, stg2Q, stg3Q, stg4Q):
+    def __init__(self, windowQ, workerQ, queryQ, soundQ, stgQ):
         super().__init__()
         self.log = logging.getLogger('Worker')
         self.log.setLevel(logging.INFO)
@@ -29,16 +24,9 @@ class Trader(QThread):
         self.workerQ = workerQ
         self.queryQ = queryQ
         self.soundQ = soundQ
-        self.stg1Q = stg1Q
-        self.stg2Q = stg2Q
-        self.stg3Q = stg3Q
-        self.stg4Q = stg4Q
+        self.stgQ = stgQ
 
         self.upbit = None                               # 매도수 주문 및 체결 확인용 객체
-        self.tickers1 = None                            # 전략 연산 1 프로세스로 보낼 티커 리스트
-        self.tickers2 = None                            # 전략 연산 2 프로세스로 보낼 티커 리스트
-        self.tickers3 = None                            # 전략 연산 3 프로세스로 보낼 티커 리스트
-        self.tickers4 = None                            # 전략 연산 4 프로세스로 보낼 티커 리스트
         self.buy_uuid = None                            # 매수 주문 저장용 list: [티커명, uuid]
         self.sell_uuid = None                           # 매도 주문 저장용 list: [티커명, uuid]
         self.websocketQ = None                          # 실시간데이터 수신용 웹소켓큐
@@ -90,9 +78,9 @@ class Trader(QThread):
         con.close()
 
         if len(self.df_cj) > 0:
-            self.data0.emit([ui_num['체결목록'], self.df_cj])
+            self.windowQ.put([ui_num['체결목록'], self.df_cj])
         if len(self.df_td) > 0:
-            self.data0.emit([ui_num['거래목록'], self.df_td])
+            self.windowQ.put([ui_num['거래목록'], self.df_td])
 
     def GetKey(self):
         """
@@ -126,14 +114,7 @@ class Trader(QThread):
         실시간 데이터 수신용 웹소켓큐 생성
         """
         tickers = pyupbit.get_tickers(fiat="KRW")
-        self.tickers1 = [ticker for i, ticker in enumerate(tickers) if i % 4 == 0]
-        self.tickers2 = [ticker for i, ticker in enumerate(tickers) if i % 4 == 1]
-        self.tickers3 = [ticker for i, ticker in enumerate(tickers) if i % 4 == 2]
-        self.tickers4 = [ticker for i, ticker in enumerate(tickers) if i % 4 == 3]
-        self.stg1Q.put(['관심종목초기화', self.tickers1])
-        self.stg2Q.put(['관심종목초기화', self.tickers2])
-        self.stg3Q.put(['관심종목초기화', self.tickers3])
-        self.stg4Q.put(['관심종목초기화', self.tickers4])
+        self.stgQ.put(['관심종목초기화', tickers])
         if init:
             self.websocketQ.terminate()
             self.queryQ.put([self.df_tt, 'totaltradelist', 'append'])
@@ -143,27 +124,7 @@ class Trader(QThread):
         self.websocketQ = WebSocketManager('ticker', tickers)
 
     def EventLoop(self):
-        dict_count = 0
-        dict_gsjm = {}
         while True:
-            """
-            UI 갱신용 큐를 감시한다.
-            4개의 프로세스로 분리된 관심종목 딕셔너리가 합쳐지면 정렬해서 UI 프로세스로 보낸다.
-            리스트 길이 4개짜리는 프로세스 정보 갱신용이다.
-            """
-            if not self.windowQ.empty():
-                data = self.windowQ.get()
-                if len(data) == 2:
-                    dict_count += 1
-                    dict_gsjm.update(data[1])
-                    if dict_count == 4:
-                        sorted(dict_gsjm)
-                        self.data1.emit([data[0], dict_gsjm])
-                        dict_gsjm = {}
-                        dict_count = 0
-                elif len(data) == 4:
-                    self.data2.emit([data[0], data[1], data[2], data[3]])
-
             """
             주문용 큐를 감시한다.
             주문용 큐에 대한 입력은 모두 전략 연산 프로세스에서 이뤄진다.
@@ -203,15 +164,7 @@ class Trader(QThread):
                 uuidnone = self.buy_uuid is None
                 injango = ticker in self.df_jg.index
                 data = [ticker, c, h, low, per, dm, bid, ask, t, uuidnone, injango, self.dict_intg['종목당투자금']]
-
-                if ticker in self.tickers1:
-                    self.stg1Q.put(data)
-                elif ticker in self.tickers2:
-                    self.stg2Q.put(data)
-                elif ticker in self.tickers3:
-                    self.stg3Q.put(data)
-                elif ticker in self.tickers4:
-                    self.stg4Q.put(data)
+                self.stgQ.put(data)
 
                 """ 잔고목록 갱신 및 매도조건 확인 """
                 if injango:
@@ -222,19 +175,13 @@ class Trader(QThread):
                 self.dict_bool['장중단타전략중단'] = True
                 self.dict_bool['장초단타전략중단'] = False
                 self.JangoCheongsan()
-                self.stg1Q.put(['장초단타전략시작', ''])
-                self.stg2Q.put(['장초단타전략시작', ''])
-                self.stg3Q.put(['장초단타전략시작', ''])
-                self.stg4Q.put(['장초단타전략시작', ''])
+                self.stgQ.put(['장초단타전략시작', ''])
 
             if self.int_ctime <= 100000 < int(t) and not self.dict_bool['장초단타전략중단']:
                 self.dict_bool['장초단타전략중단'] = True
                 self.dict_bool['장중단타전략중단'] = False
                 self.JangoCheongsan()
-                self.stg1Q.put(['장중단타전략시작', ''])
-                self.stg2Q.put(['장중단타전략시작', ''])
-                self.stg3Q.put(['장중단타전략시작', ''])
-                self.stg4Q.put(['장중단타전략시작', ''])
+                self.stgQ.put(['장중단타전략시작', ''])
 
             if int(t) != self.int_ctime:
                 self.int_ctime = int(t)
@@ -256,7 +203,7 @@ class Trader(QThread):
                 self.UpdateTotaljango()
                 self.dict_time['거래정보'] = timedelta_sec(1)
             if now() > self.dict_time['부가정보']:
-                self.data2.emit([1, '부가정보업데이트'])
+                self.windowQ.put([1, '부가정보업데이트'])
                 self.dict_time['부가정보'] = timedelta_sec(2)
 
     """
@@ -273,14 +220,14 @@ class Trader(QThread):
     """
     def Buy(self, ticker, c, oc):
         if self.buy_uuid is not None:
-            self.CompleteSignal('매수완료', ticker)
+            self.stgQ.put('매수완료', ticker)
             return
 
         if self.dict_intg['예수금'] < c * oc:
             df = self.df_cj[(self.df_cj['주문구분'] == '시드부족') & (self.df_cj['종목명'] == ticker)]
             if len(df) == 0 or now() > timedelta_sec(180, strp_time('%Y%m%d%H%M%S%f', df['체결시간'][0])):
                 self.UpdateBuy(ticker, c, oc, cancle=True)
-            self.CompleteSignal('매수완료', ticker)
+            self.stgQ.put('매수완료', ticker)
             return
 
         if self.dict_bool['모의모드']:
@@ -292,7 +239,7 @@ class Trader(QThread):
 
     def Sell(self, ticker, c, oc):
         if self.sell_uuid is not None:
-            self.CompleteSignal('매도완료', ticker)
+            self.stgQ.put('매도완료', ticker)
             return
 
         if self.dict_bool['모의모드']:
@@ -301,16 +248,6 @@ class Trader(QThread):
             ret = self.upbit.sell_market_order(ticker, oc)
             self.sell_uuid = [ticker, ret[0]['uuid']]
             self.dict_time['체결확인'] = timedelta_sec(1)
-
-    def CompleteSignal(self, gubun, ticker):
-        if ticker in self.tickers1:
-            self.stg1Q.put([gubun, ticker])
-        elif ticker in self.tickers2:
-            self.stg2Q.put([gubun, ticker])
-        elif ticker in self.tickers3:
-            self.stg3Q.put([gubun, ticker])
-        elif ticker in self.tickers4:
-            self.stg4Q.put([gubun, ticker])
 
     def UpdateJango(self, ticker, c, ch):
         prec = self.df_jg['현재가'][ticker]
@@ -321,14 +258,7 @@ class Trader(QThread):
             columns = ['현재가', '수익률', '평가손익', '평가금액']
             self.df_jg.at[ticker, columns] = c, sp, sg, pg
             data = [ticker, sp, jc, ch, c]
-            if ticker in self.tickers1:
-                self.stg1Q.put(data)
-            elif ticker in self.tickers2:
-                self.stg2Q.put(data)
-            elif ticker in self.tickers3:
-                self.stg3Q.put(data)
-            elif ticker in self.tickers4:
-                self.stg4Q.put(data)
+            self.stgQ.put(data)
 
     def JangoCheongsan(self):
         for ticker in self.df_jg.index:
@@ -348,7 +278,7 @@ class Trader(QThread):
                 cp = ret['price']
                 cc = ret['executed_volume']
                 self.UpdateBuy(ticker, cp, cc)
-                self.CompleteSignal('매수완료', ticker)
+                self.stgQ.put('매수완료', ticker)
                 self.buy_uuid = None
         if self.sell_uuid is not None and ticker == self.sell_uuid[0]:
             ret = self.upbit.get_order(self.sell_uuid[1])
@@ -356,7 +286,7 @@ class Trader(QThread):
                 cp = ret['price']
                 cc = ret['executed_volume']
                 self.UpdateSell(ticker, cp, cc)
-                self.CompleteSignal('매도완료', ticker)
+                self.stgQ.put('매도완료', ticker)
                 self.sell_uuid = None
 
     def UpdateBuy(self, ticker, cp, cc, cancle=False):
@@ -364,7 +294,7 @@ class Trader(QThread):
         order_gubun = '매수' if not cancle else '시드부족'
         self.df_cj.at[dt] = ticker, order_gubun, cc, 0, cp, cp, dt
         self.df_cj.sort_values(by='체결시간', ascending=False, inplace=True)
-        self.data0.emit([ui_num['체결목록'], self.df_cj])
+        self.windowQ.put([ui_num['체결목록'], self.df_cj])
         if not cancle:
             bg = cp * cc
             pg, sg, sp = self.GetPgSgSp(bg, bg)
@@ -374,7 +304,7 @@ class Trader(QThread):
             self.queryQ.put([self.df_jg, 'jangolist', 'replace'])
             text = f'매매 시스템 체결 알림 - {ticker} {cc}코인 매수'
             self.log.info(f'[{now()}] {text}')
-            self.data2.emit([0, text])
+            self.windowQ.put([0, text])
             self.soundQ.put(f'{ticker} {cc}코인을 매수하였습니다.')
             telegram_msg(f'매수 알림 - {ticker} {cp} {cc}')
         df = pd.DataFrame([[ticker, order_gubun, cc, 0, cp, cp, dt]], columns=columns_cj, index=[dt])
@@ -400,12 +330,12 @@ class Trader(QThread):
         d = dt[:8]
         self.df_tt = pd.DataFrame([[tdct, tbg, tsg, tsig, tssg, sp, sg]], columns=columns_tt, index=[d])
 
-        self.data0.emit([ui_num['체결목록'], self.df_cj])
-        self.data0.emit([ui_num['거래목록'], self.df_td])
-        self.data0.emit([ui_num['거래합계'], self.df_tt])
+        self.windowQ.put([ui_num['체결목록'], self.df_cj])
+        self.windowQ.put([ui_num['거래목록'], self.df_td])
+        self.windowQ.put([ui_num['거래합계'], self.df_tt])
         text = f'매매 시스템 체결 알림 - {ticker} {bp}코인 매도'
         self.log.info(f'[{now()}] {text}')
-        self.data2.emit([0, text])
+        self.windowQ.put([0, text])
         self.soundQ.put(f'{ticker} {cc}코인을 매도하였습니다.')
         telegram_msg(f'매도 알림 - {ticker} {cp} {cc}')
         telegram_msg(f'손익 알림 - 총매수금액 {tbg}, 총매도금액{tsg}, 수익 {tsig}, 손실 {tssg}, 수익급합계 {sg}')
@@ -437,5 +367,5 @@ class Trader(QThread):
             self.df_tj.at[self.str_today] = ttg, self.dict_intg['예수금'], bct, tsp, tsg, tbg, tpg
         else:
             self.df_tj.at[self.str_today] = self.dict_intg['예수금'], self.dict_intg['예수금'], 0, 0.0, 0, 0, 0
-        self.data0.emit([ui_num['잔고목록'], self.df_jg])
-        self.data0.emit([ui_num['잔고평가'], self.df_tj])
+        self.windowQ.put([ui_num['잔고목록'], self.df_jg])
+        self.windowQ.put([ui_num['잔고평가'], self.df_tj])
