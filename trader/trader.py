@@ -60,7 +60,6 @@ class Trader(QThread):
         self.LoadDatabase()
         self.GetKey()
         self.GetBalances()
-        self.Initialization()
         self.EventLoop()
 
     def LoadDatabase(self):
@@ -102,28 +101,10 @@ class Trader(QThread):
             self.dict_intg['예수금'] = int(float(self.upbit.get_balances()[0][0]['balance']))
         self.dict_intg['종목당투자금'] = int(self.dict_intg['예수금'] / self.dict_intg['최대매수종목수'])
 
-    def Initialization(self, init=False):
-        """
-        프로그램 구동 시
-        - 업비트 원화 시장 티커 리스트 불러오기
-        - 전략 연산 프로세스의 관심종목용 딕셔너리 초기화
-        날짜 변경 시
-        - 기존 웹소켓큐 제거
-        - 전일실현손익 저장
-        - 체결목록, 거래목록, 실현손익 초기화
-        실시간 데이터 수신용 웹소켓큐 생성
-        """
+    def EventLoop(self):
         tickers = pyupbit.get_tickers(fiat="KRW")
         self.stgQ.put(['관심종목초기화', tickers])
-        if init:
-            self.websocketQ.terminate()
-            self.queryQ.put([self.df_tt, 'totaltradelist', 'append'])
-            self.df_cj = pd.DataFrame(columns=columns_cj)
-            self.df_td = pd.DataFrame(columns=columns_td)
-            self.df_tt = pd.DataFrame(columns=columns_tt)
-        self.websocketQ = WebSocketManager('ticker', tickers)
-
-    def EventLoop(self):
+        websocketQ = WebSocketManager('ticker', tickers)
         while True:
             """
             주문용 큐를 감시한다.
@@ -140,7 +121,7 @@ class Trader(QThread):
             실시간 웹소켓큐로 데이터가 들어오면 우선 티커명, 시간을 뽑아
             티커별 마지막 시간이 저장된 self.dict_jcdt의 시간과 틀리면 전략 연산 프로세스로 데이터를 보낸다. 
             """
-            data = self.websocketQ.get()
+            data = websocketQ.get()
             ticker = data['code']
             d = data['trade_date']
             t = data['trade_time']
@@ -192,10 +173,13 @@ class Trader(QThread):
             if int(t) != self.int_ctime:
                 self.int_ctime = int(t)
 
-            """ 날짜 변경시 날짜변수 갱신, 각종목록 및 웹소켓큐 초기화 """
+            """ 날짜 변경시 날짜변수 갱신, 당일 실현손익 저장, 각종목록 초기화 """
             if d != self.str_today:
                 self.str_today = d
-                self.Initialization(init=True)
+                self.queryQ.put([self.df_tt, 'totaltradelist', 'append'])
+                self.df_cj = pd.DataFrame(columns=columns_cj)
+                self.df_td = pd.DataFrame(columns=columns_td)
+                self.df_tt = pd.DataFrame(columns=columns_tt)
                 telegram_msg('관심종목 및 거래정보를 업데이트하였습니다.')
 
             """
