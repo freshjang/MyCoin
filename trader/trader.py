@@ -48,6 +48,7 @@ class Trader(QThread):
         self.df_td = pd.DataFrame(columns=columns_td)   # 거래목록
         self.df_tt = pd.DataFrame(columns=columns_tt)   # 실현손익
         self.str_today = strf_time('%Y%m%d', timedelta_hour(-9))
+        self.int_ctime = int(strf_time('%H%M%S', timedelta_hour(-9)))
         self.dict_jcdt = {}                             # 종목별 체결시간 저장용
         self.dict_intg = {
             '예수금': 0,
@@ -56,7 +57,9 @@ class Trader(QThread):
             '업비트수수료': 0.                            # 0.5% 일경우 0.005로 입력
         }
         self.dict_bool = {
-            '모의모드': True                             # 모의모드 False 상태시만 주문 전송
+            '모의모드': True,                            # 모의모드 False 상태시만 주문 전송
+            '장초단타전략중단': False,
+            '장중단타전략중단': False
         }
         self.dict_time = {
             '체결확인': now(),                           # 1초 마다 체결 확인용
@@ -179,15 +182,14 @@ class Trader(QThread):
             ticker = data['code']
             d = data['trade_date']
             t = data['trade_time']
-            dt = d + t
 
             try:
-                last_jcdt = self.dict_jcdt[ticker]
+                last_jcct = self.dict_jcdt[ticker]
             except KeyError:
-                last_jcdt = None
+                last_jcct = None
 
-            if last_jcdt is None or dt != last_jcdt:
-                self.dict_jcdt[ticker] = dt
+            if last_jcct is None or t != last_jcct:
+                self.dict_jcdt[ticker] = t
 
                 c = data['trade_price']
                 h = data['high_price']
@@ -199,7 +201,7 @@ class Trader(QThread):
 
                 uuidnone = self.buy_uuid is None
                 injango = ticker in self.df_jg.index
-                data = [ticker, c, h, low, per, dm, bid, ask, d, t, uuidnone, injango, self.dict_intg['종목당투자금']]
+                data = [ticker, c, h, low, per, dm, bid, ask, t, uuidnone, injango, self.dict_intg['종목당투자금']]
 
                 if ticker in self.tickers1:
                     self.stg1Q.put(data)
@@ -215,11 +217,32 @@ class Trader(QThread):
                     ch = round(bid / ask * 100, 2)
                     self.UpdateJango(ticker, c, ch)
 
-                """ 날짜 변경시 날짜변수 갱신, 각종목록 및 웹소켓큐 초기화 """
-                if d != self.str_today:
-                    self.str_today = d
-                    self.Initialization(init=True)
-                    telegram_msg('관심종목 및 거래정보를 업데이트하였습니다.')
+            if self.int_ctime <= 90000 < int(t) and not self.dict_bool['장중단타전략중단']:
+                self.dict_bool['장중단타전략중단'] = True
+                self.dict_bool['장초단타전략중단'] = False
+                self.JangoCheongsan()
+                self.stg1Q.put(['장초단타전략시작', ''])
+                self.stg2Q.put(['장초단타전략시작', ''])
+                self.stg3Q.put(['장초단타전략시작', ''])
+                self.stg4Q.put(['장초단타전략시작', ''])
+
+            if self.int_ctime <= 100000 < int(t) and not self.dict_bool['장초단타전략중단']:
+                self.dict_bool['장초단타전략중단'] = True
+                self.dict_bool['장중단타전략중단'] = False
+                self.JangoCheongsan()
+                self.stg1Q.put(['장중단타전략시작', ''])
+                self.stg2Q.put(['장중단타전략시작', ''])
+                self.stg3Q.put(['장중단타전략시작', ''])
+                self.stg4Q.put(['장중단타전략시작', ''])
+
+            if int(t) != self.int_ctime:
+                self.int_ctime = int(t)
+
+            """ 날짜 변경시 날짜변수 갱신, 각종목록 및 웹소켓큐 초기화 """
+            if d != self.str_today:
+                self.str_today = d
+                self.Initialization(init=True)
+                telegram_msg('관심종목 및 거래정보를 업데이트하였습니다.')
 
             """
             체결확인, 거래정보, 관심종목 정보는 1초마다 확인 및 갱신되며
