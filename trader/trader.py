@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import logging
 import sqlite3
 import pyupbit
@@ -249,7 +250,7 @@ class Trader(QThread):
             프로세스 정보가 담긴 부가정보는 2초마다 갱신된다.
             """
             if not self.dict_bool['모의모드'] and now() > self.dict_time['체결확인']:
-                self.CheckChegeol(ticker, d + t)
+                self.CheckChegeol(ticker)
                 self.dict_time['체결확인'] = timedelta_sec(1)
             if now() > self.dict_time['거래정보']:
                 self.UpdateTotaljango()
@@ -278,13 +279,12 @@ class Trader(QThread):
         if self.dict_intg['예수금'] < c * oc:
             df = self.df_cj[(self.df_cj['주문구분'] == '시드부족') & (self.df_cj['종목명'] == ticker)]
             if len(df) == 0 or now() > timedelta_sec(180, strp_time('%Y%m%d%H%M%S%f', df['체결시간'][0])):
-                self.UpdateBuy(ticker, c, oc, strf_time('%Y%m%d%H%M%S'), cancle=True)
+                self.UpdateBuy(ticker, c, oc, cancle=True)
             self.CompleteSignal('매수완료', ticker)
             return
 
-        dt = strf_time('%Y%m%d%H%M%S')
         if self.dict_bool['모의모드']:
-            self.UpdateBuy(ticker, c, oc, dt)
+            self.UpdateBuy(ticker, c, oc)
         else:
             ret = self.upbit.buy_market_order(ticker, self.dict_intg['종목당투자금'])
             self.buy_uuid = [ticker, ret[0]['uuid']]
@@ -295,9 +295,8 @@ class Trader(QThread):
             self.CompleteSignal('매도완료', ticker)
             return
 
-        dt = strf_time('%Y%m%d%H%M%S')
         if self.dict_bool['모의모드']:
-            self.UpdateSell(ticker, c, oc, dt)
+            self.UpdateSell(ticker, c, oc)
         else:
             ret = self.upbit.sell_market_order(ticker, oc)
             self.sell_uuid = [ticker, ret[0]['uuid']]
@@ -331,13 +330,24 @@ class Trader(QThread):
             elif ticker in self.tickers4:
                 self.stg4Q.put(data)
 
-    def CheckChegeol(self, ticker, dt):
+    def JangoCheongsan(self):
+        for ticker in self.df_jg.index:
+            c = self.df_jg['현재가'][ticker]
+            oc = self.df_jg['보유수량'][ticker]
+            if self.dict_bool['모의모드']:
+                self.UpdateSell(ticker, c, oc)
+            else:
+                self.upbit.sell_market_order(ticker, oc)
+                time.sleep(0.2)
+        self.soundQ.put('잔고청산 주문을 전송하였습니다.')
+
+    def CheckChegeol(self, ticker):
         if self.buy_uuid is not None and ticker == self.buy_uuid[0]:
             ret = self.upbit.get_order(self.buy_uuid[1])
             if ret is not None and ret['state'] == 'done':
                 cp = ret['price']
                 cc = ret['executed_volume']
-                self.UpdateBuy(ticker, cp, cc, dt)
+                self.UpdateBuy(ticker, cp, cc)
                 self.CompleteSignal('매수완료', ticker)
                 self.buy_uuid = None
         if self.sell_uuid is not None and ticker == self.sell_uuid[0]:
@@ -345,12 +355,12 @@ class Trader(QThread):
             if ret is not None and ret['state'] == 'done':
                 cp = ret['price']
                 cc = ret['executed_volume']
-                self.UpdateSell(ticker, cp, cc, dt)
+                self.UpdateSell(ticker, cp, cc)
                 self.CompleteSignal('매도완료', ticker)
                 self.sell_uuid = None
 
-    def UpdateBuy(self, ticker, cp, cc, dt, cancle=False):
-        idt = strf_time('%Y%m%d%H%M%S%f')
+    def UpdateBuy(self, ticker, cp, cc, cancle=False):
+        dt = strf_time('%Y%m%d%H%M%S%f', timedelta_hour(-9))
         order_gubun = '매수' if not cancle else '시드부족'
         self.df_cj.at[dt] = ticker, order_gubun, cc, 0, cp, cp, dt
         self.df_cj.sort_values(by='체결시간', ascending=False, inplace=True)
@@ -367,10 +377,11 @@ class Trader(QThread):
             self.data2.emit([0, text])
             self.soundQ.put(f'{ticker} {cc}코인을 매수하였습니다.')
             telegram_msg(f'매수 알림 - {ticker} {cp} {cc}')
-        df = pd.DataFrame([[ticker, order_gubun, cc, 0, cp, cp, dt]], columns=columns_cj, index=[idt])
+        df = pd.DataFrame([[ticker, order_gubun, cc, 0, cp, cp, dt]], columns=columns_cj, index=[dt])
         self.queryQ.put([df, 'chegeollist', 'append'])
 
-    def UpdateSell(self, ticker, cp, cc, dt):
+    def UpdateSell(self, ticker, cp, cc):
+        dt = strf_time('%Y%m%d%H%M%S%f', timedelta_hour(-9))
         bp = self.df_jg['매입가'][ticker]
         bg = bp * cc
         pg, sg, sp = self.GetPgSgSp(bg, cp * cc)

@@ -4,11 +4,9 @@ import sqlite3
 import logging
 import pyupbit
 import pandas as pd
-from PyQt5 import QtCore
-from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPalette
-from PyQt5.QtCore import QThread
+from PyQt5 import QtCore, QtWidgets
+from PyQt5.QtCore import Qt, QThread
 from pyupbit import WebSocketManager
 from multiprocessing import Process, Queue
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))

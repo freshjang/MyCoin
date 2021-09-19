@@ -3,18 +3,17 @@ import sys
 import psutil
 import sqlite3
 import pandas as pd
-from PyQt5 import QtCore
-from PyQt5 import QtWidgets
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPalette
+from PyQt5 import QtCore, QtWidgets
 from multiprocessing import Queue, Process
 from trader import Trader
 from strategy import Strategy
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from utility.query import Query
 from utility.sound import Sound
-from utility.static import *
 from utility.setting import *
+from utility.static import strf_time, thread_decorator, strp_time
 
 
 class Window(QtWidgets.QMainWindow):
