@@ -263,6 +263,9 @@ class Total:
                 break
 
         if len(df_back) > 0:
+            text = [self.gap_ch, self.avg_time, self.gap_sm, self.ch_low, self.dm_low,
+                    self.per_low, self.per_high, self.cs_per]
+            print(f' {text}')
             tc = df_back['거래횟수'].sum()
             if tc != 0:
                 pc = df_back['익절'].sum()
@@ -277,9 +280,6 @@ class Total:
                 if onegm < BATTING:
                     onegm = BATTING
                 tsp = round(tsg / onegm * 100, 4)
-                text = [self.gap_ch, self.avg_time, self.gap_sm, self.ch_low, self.dm_low,
-                        self.per_low, self.per_high, self.cs_per]
-                print(f' {text}')
                 text = f" 종목당 배팅금액 {format(BATTING, ',')}원, 필요자금 {format(onegm, ',')}원, "\
                        f" 종목출현빈도수 {onedaycount}개/초, 거래횟수 {tc}회, 평균보유기간 {avghold}초,\n 익절 {pc}회, "\
                        f" 손절 {mc}회, 승률 {pper}%, 평균수익률 {avgsp}%, 수익률합계 {tsp}%, 수익금합계 {format(tsg, ',')}원"
