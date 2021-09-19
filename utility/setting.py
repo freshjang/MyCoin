@@ -2,6 +2,7 @@ from PyQt5.QtGui import QFont, QColor
 
 system_path = 'D:/PythonProjects/MyCoin'
 db_path = f'{system_path}/database'
+graph_path = f'{system_path}/backtester/graph'
 db_stg = f'{db_path}/stg.db'
 db_tick = f'{db_path}/tick1.db'
 db_backtest = f'{db_path}/backtest.db'
