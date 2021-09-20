@@ -210,14 +210,14 @@ class Trader(QThread):
     """
     def Buy(self, ticker, c, oc):
         if self.buy_uuid is not None:
-            self.stgQ.put('매수완료', ticker)
+            self.stgQ.put(['매수완료', ticker])
             return
 
         if self.dict_intg['예수금'] < c * oc:
             df = self.df_cj[(self.df_cj['주문구분'] == '시드부족') & (self.df_cj['종목명'] == ticker)]
             if len(df) == 0 or now() > timedelta_sec(180, strp_time('%Y%m%d%H%M%S%f', df['체결시간'][0])):
                 self.UpdateBuy(ticker, c, oc, cancle=True)
-            self.stgQ.put('매수완료', ticker)
+            self.stgQ.put(['매수완료', ticker])
             return
 
         if self.dict_bool['모의모드']:
@@ -229,7 +229,7 @@ class Trader(QThread):
 
     def Sell(self, ticker, c, oc):
         if self.sell_uuid is not None:
-            self.stgQ.put('매도완료', ticker)
+            self.stgQ.put(['매도완료', ticker])
             return
 
         if self.dict_bool['모의모드']:
@@ -268,7 +268,7 @@ class Trader(QThread):
                 cp = ret['price']
                 cc = ret['executed_volume']
                 self.UpdateBuy(ticker, cp, cc)
-                self.stgQ.put('매수완료', ticker)
+                self.stgQ.put(['매수완료', ticker])
                 self.buy_uuid = None
         if self.sell_uuid is not None and ticker == self.sell_uuid[0]:
             ret = self.upbit.get_order(self.sell_uuid[1])
@@ -276,7 +276,7 @@ class Trader(QThread):
                 cp = ret['price']
                 cc = ret['executed_volume']
                 self.UpdateSell(ticker, cp, cc)
-                self.stgQ.put('매도완료', ticker)
+                self.stgQ.put(['매도완료', ticker])
                 self.sell_uuid = None
 
     def UpdateBuy(self, ticker, cp, cc, cancle=False):
