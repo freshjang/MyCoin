@@ -13,7 +13,7 @@ TESTPERIOD = 14         # 백테스팅 기간(14일 경우 과거 2주간의 데
 TOTALTIME = 1209600     # 백테스팅 기간 동안 10시부터 장마감까지의 시간 총합, 단위 초
 
 
-class BackTester1m:
+class BackTester2m:
     def __init__(self, q_, ticker_list_, num_):
         self.q = q_
         self.ticker_list = ticker_list_
@@ -327,7 +327,7 @@ if __name__ == "__main__":
     workcount = int(last / 6) + 1
     for j in range(0, last, workcount):
         ticker_list = table_list[j:j + workcount]
-        p = Process(target=BackTester1m, args=(q, ticker_list, num))
+        p = Process(target=BackTester2m, args=(q, ticker_list, num))
         procs.append(p)
         p.start()
     for p in procs:
