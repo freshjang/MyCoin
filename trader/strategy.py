@@ -124,7 +124,7 @@ class Strategy:
         if ticker not in self.dict_gsjm.keys():
             return
 
-        time = 1 if 90000 < int(strf_time('%H%M%S', timedelta_hour(-9))) <= 1000000 else 2
+        tn = 1 if 90000 < int(strf_time('%H%M%S', timedelta_hour(-9))) <= 1000000 else 2
         hlm = round((h + low) / 2)
         hlmp = round((c / hlm - 1) * 100, 2)
         predm = self.dict_gsjm[ticker]['누적거래대금'][1]
@@ -134,15 +134,15 @@ class Strategy:
         except ZeroDivisionError:
             ch = 500.
         self.dict_gsjm[ticker] = self.dict_gsjm[ticker].shift(1)
-        if len(self.dict_gsjm[ticker]) == self.dict_intg[f'평균시간{time}'] + 2 and \
-                self.dict_gsjm[ticker]['체결강도'][self.dict_intg[f'평균시간{time}']] != 0.:
-            avg_sm = int(self.dict_gsjm[ticker]['거래대금'][1:self.dict_intg[f'평균시간{time}'] + 1].mean())
-            avg_ch = round(self.dict_gsjm[ticker]['체결강도'][1:self.dict_intg[f'평균시간{time}'] + 1].mean(), 2)
-            high_ch = round(self.dict_gsjm[ticker]['체결강도'][1:self.dict_intg[f'평균시간{time}'] + 1].max(), 2)
-            self.dict_gsjm[ticker].at[self.dict_intg[f'평균시간{time}'] + 1] = 0., 0., avg_sm, 0, avg_ch, high_ch, t
+        if len(self.dict_gsjm[ticker]) == self.dict_intg[f'평균시간{tn}'] + 2 and \
+                self.dict_gsjm[ticker]['체결강도'][self.dict_intg[f'평균시간{tn}']] != 0.:
+            avg_sm = int(self.dict_gsjm[ticker]['거래대금'][1:self.dict_intg[f'평균시간{tn}'] + 1].mean())
+            avg_ch = round(self.dict_gsjm[ticker]['체결강도'][1:self.dict_intg[f'평균시간{tn}'] + 1].mean(), 2)
+            high_ch = round(self.dict_gsjm[ticker]['체결강도'][1:self.dict_intg[f'평균시간{tn}'] + 1].max(), 2)
+            self.dict_gsjm[ticker].at[self.dict_intg[f'평균시간{tn}'] + 1] = 0., 0., avg_sm, 0, avg_ch, high_ch, t
         self.dict_gsjm[ticker].at[0] = per, hlmp, sm, dm, ch, 0., t
 
-        if self.dict_gsjm[ticker]['체결강도'][self.dict_intg[f'평균시간{time}']] == 0:
+        if self.dict_gsjm[ticker]['체결강도'][self.dict_intg[f'평균시간{tn}']] == 0:
             return
         if ticker in self.list_buy:
             return
@@ -164,7 +164,7 @@ class Strategy:
 
         oc = 0
 
-        time = 1 if 90000 < int(strf_time('%H%M%S', timedelta_hour(-9))) <= 1000000 else 2
+        tn = 1 if 90000 < int(strf_time('%H%M%S', timedelta_hour(-9))) <= 1000000 else 2
 
         # 전략 비공개
 

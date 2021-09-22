@@ -85,15 +85,15 @@ class Window(QtWidgets.QMainWindow):
         todayDate = QtCore.QDate.currentDate()
         self.calendarWidget.setCurrentPage(todayDate.year(), todayDate.month())
         self.calendarWidget.clicked.connect(self.CalendarClicked)
-        self.stn_tableWidget = setTablewidget(self.st_tab, columns_sn, len(columns_sn), 1)
-        self.stl_tableWidget = setTablewidget(self.st_tab, columns_st, len(columns_st), 44)
+        self.stn_tableWidget = setTablewidget(self.st_tab, columns_dt, len(columns_dt), 1)
+        self.stl_tableWidget = setTablewidget(self.st_tab, columns_dd, len(columns_dd), 44)
 
         self.sg_groupBox = QtWidgets.QGroupBox(self.sg_tab)
         self.sg_pushButton_01 = setPushbutton('일별집계', self.sg_groupBox, self.ButtonClicked)
         self.sg_pushButton_02 = setPushbutton('월별집계', self.sg_groupBox, self.ButtonClicked)
         self.sg_pushButton_03 = setPushbutton('연도별집계', self.sg_groupBox, self.ButtonClicked)
-        self.sgt_tableWidget = setTablewidget(self.sg_tab, columns_ln, len(columns_ln), 1)
-        self.sgl_tableWidget = setTablewidget(self.sg_tab, columns_lt, len(columns_lt), 54)
+        self.sgt_tableWidget = setTablewidget(self.sg_tab, columns_nt, len(columns_nt), 1)
+        self.sgl_tableWidget = setTablewidget(self.sg_tab, columns_nd, len(columns_nd), 54)
 
         self.table_tabWidget.addTab(self.td_tab, '계좌평가')
         self.table_tabWidget.addTab(self.gj_tab, '관심종목')
@@ -382,11 +382,11 @@ class Window(QtWidgets.QMainWindow):
             nbg, nsg = df['매수금액'].sum(), df['매도금액'].sum()
             sp = round((nsg / nbg - 1) * 100, 2)
             npg, nmg, nsig = df[df['수익금'] > 0]['수익금'].sum(), df[df['수익금'] < 0]['수익금'].sum(), df['수익금'].sum()
-            df2 = pd.DataFrame(columns=columns_sn)
+            df2 = pd.DataFrame(columns=columns_dt)
             df2.at[0] = searchday, nbg, nsg, npg, nmg, sp, nsig
         else:
-            df = pd.DataFrame(columns=columns_st)
-            df2 = pd.DataFrame(columns=columns_sn)
+            df = pd.DataFrame(columns=columns_dd)
+            df2 = pd.DataFrame(columns=columns_dt)
         self.UpdateTablewidget([ui_num['당일합계'], df2])
         self.UpdateTablewidget([ui_num['당일상세'], df])
 
@@ -404,7 +404,7 @@ class Window(QtWidgets.QMainWindow):
                 sp = round((nsg / nbg - 1) * 100, 2)
                 npg, nmg = df['총수익금액'].sum(), df['총손실금액'].sum()
                 nsig = df['수익금합계'].sum()
-                df2 = pd.DataFrame(columns=columns_ln)
+                df2 = pd.DataFrame(columns=columns_nt)
                 df2.at[0] = pr, nbg, nsg, npg, nmg, sp, nsig
                 self.UpdateTablewidget([ui_num['누적합계'], df2])
             else:
@@ -414,7 +414,7 @@ class Window(QtWidgets.QMainWindow):
                 self.UpdateTablewidget([ui_num['누적상세'], df])
             elif cmd == '월별집계':
                 df['일자'] = df['index'].apply(lambda x: x[:6])
-                df2 = pd.DataFrame(columns=columns_lt)
+                df2 = pd.DataFrame(columns=columns_nd)
                 lastmonth = df['일자'][df.index[-1]]
                 month = strf_time('%Y%m')
                 while int(month) >= int(lastmonth):
@@ -429,7 +429,7 @@ class Window(QtWidgets.QMainWindow):
                 self.UpdateTablewidget([ui_num['누적상세'], df2])
             elif cmd == '연도별집계':
                 df['일자'] = df['index'].apply(lambda x: x[:4])
-                df2 = pd.DataFrame(columns=columns_lt)
+                df2 = pd.DataFrame(columns=columns_nd)
                 lastyear = df['일자'][df.index[-1]]
                 year = strf_time('%Y')
                 while int(year) >= int(lastyear):
