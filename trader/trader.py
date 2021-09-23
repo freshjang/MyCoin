@@ -101,6 +101,9 @@ class Trader(QThread):
             self.dict_intg['예수금'] = int(float(self.upbit.get_balances()[0][0]['balance']))
         self.dict_intg['종목당투자금'] = int(self.dict_intg['예수금'] / self.dict_intg['최대매수종목수'])
 
+        if len(self.df_td) > 0:
+            self.UpdateTotaltradelist(first=True)
+
     def EventLoop(self):
         tickers = pyupbit.get_tickers(fiat="KRW")
         self.stgQ.put(['관심종목초기화', tickers])
@@ -170,11 +173,11 @@ class Trader(QThread):
                 self.stgQ.put(['장중단타전략시작', ''])
 
             """ 전략 운영 시간 기록용 """
-            if int(t) != self.int_ctime:
+            if int(t) > self.int_ctime:
                 self.int_ctime = int(t)
 
             """ 날짜 변경시 날짜변수 갱신, 당일 실현손익 저장, 각종목록 초기화 """
-            if d != self.str_today:
+            if int(d) > int(self.str_today):
                 self.str_today = d
                 self.queryQ.put([self.df_tt, 'totaltradelist', 'append'])
                 self.df_cj = pd.DataFrame(columns=columns_cj)
@@ -306,10 +309,29 @@ class Trader(QThread):
         bg = bp * cc
         pg, sg, sp = self.GetPgSgSp(bg, cp * cc)
         self.dict_intg['예수금'] += bg + sg
+
         self.df_jg.drop(index=ticker, inplace=True)
         self.df_cj.at[dt] = ticker, '매도', cc, 0, cp, cp, dt
         self.df_td.at[dt] = ticker, bg, pg, cc, sp, sg, dt
         self.df_td.sort_values(by=['체결시간'], ascending=False, inplace=True)
+
+        self.windowQ.put([ui_num['체결목록'], self.df_cj])
+        self.windowQ.put([ui_num['거래목록'], self.df_td])
+
+        text = f'매매 시스템 체결 알림 - {ticker} {bp}코인 매도'
+        self.log.info(f'[{now()}] {text}')
+        self.windowQ.put([0, text])
+        self.soundQ.put(f'{ticker} {cc}코인을 매도하였습니다.')
+
+        self.queryQ.put([self.df_jg, 'jangolist', 'replace'])
+        df = pd.DataFrame([[ticker, '매도', cc, 0, cp, cp, dt]], columns=columns_cj, index=[dt])
+        self.queryQ.put([df, 'chegeollist', 'append'])
+        df = pd.DataFrame([[ticker, bg, pg, cc, sp, sg, dt]], columns=columns_td, index=[dt])
+        self.queryQ.put([df, 'tradelist', 'append'])
+        telegram_msg(f'매도 알림 - {ticker} {cp} {cc}')
+        self.UpdateTotaltradelist()
+
+    def UpdateTotaltradelist(self, first=False):
         tsg = self.df_td['매도금액'].sum()
         tbg = self.df_td['매수금액'].sum()
         tsig = self.df_td[self.df_td['수익금'] > 0]['수익금'].sum()
@@ -317,25 +339,10 @@ class Trader(QThread):
         sg = self.df_td['수익금'].sum()
         sp = round(sg / tbg * 100, 2)
         tdct = len(self.df_td)
-        d = dt[:8]
-        self.df_tt = pd.DataFrame([[tdct, tbg, tsg, tsig, tssg, sp, sg]], columns=columns_tt, index=[d])
-
-        self.windowQ.put([ui_num['체결목록'], self.df_cj])
-        self.windowQ.put([ui_num['거래목록'], self.df_td])
+        self.df_tt = pd.DataFrame([[tdct, tbg, tsg, tsig, tssg, sp, sg]], columns=columns_tt, index=[self.str_today])
         self.windowQ.put([ui_num['거래합계'], self.df_tt])
-        text = f'매매 시스템 체결 알림 - {ticker} {bp}코인 매도'
-        self.log.info(f'[{now()}] {text}')
-        self.windowQ.put([0, text])
-        self.soundQ.put(f'{ticker} {cc}코인을 매도하였습니다.')
-        telegram_msg(f'매도 알림 - {ticker} {cp} {cc}')
-        telegram_msg(f'손익 알림 - 총매수금액 {tbg}, 총매도금액{tsg}, 수익 {tsig}, 손실 {tssg}, 수익급합계 {sg}')
-
-        idt = strf_time('%Y%m%d%H%M%S%f')
-        df = pd.DataFrame([[ticker, '매도', cc, 0, cp, cp, dt]], columns=columns_cj, index=[idt])
-        self.queryQ.put([df, 'chegeollist', 'append'])
-        df = pd.DataFrame([[ticker, bg, pg, cc, sp, sg, dt]], columns=columns_td, index=[idt])
-        self.queryQ.put([df, 'tradelist', 'append'])
-        self.queryQ.put([self.df_jg, 'jangolist', 'replace'])
+        if not first:
+            telegram_msg(f'손익 알림 - 총매수금액 {tbg}, 총매도금액{tsg}, 수익 {tsig}, 손실 {tssg}, 수익급합계 {sg}')
 
     # noinspection PyMethodMayBeStatic
     def GetPgSgSp(self, bg, cg):
