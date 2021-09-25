@@ -98,7 +98,7 @@ class Trader(QThread):
         if self.dict_bool['모의모드']:
             self.dict_intg['예수금'] = 100000000
         else:
-            self.dict_intg['예수금'] = int(float(self.upbit.get_balances()[0][0]['balance']))
+            self.dict_intg['예수금'] = int(float(self.upbit.get_balances()[0]['balance']))
         self.dict_intg['종목당투자금'] = int(self.dict_intg['예수금'] / self.dict_intg['최대매수종목수'])
 
         if len(self.df_td) > 0:
@@ -185,13 +185,16 @@ class Trader(QThread):
                 self.df_tt = pd.DataFrame(columns=columns_tt)
                 telegram_msg('관심종목 및 거래정보를 업데이트하였습니다.')
 
-            """
-            체결확인, 거래정보, 관심종목 정보는 1초마다 확인 및 갱신되며
-            프로세스 정보가 담긴 부가정보는 2초마다 갱신된다.
-            """
-            if not self.dict_bool['모의모드'] and now() > self.dict_time['체결확인']:
-                self.CheckChegeol(ticker)
-                self.dict_time['체결확인'] = timedelta_sec(1)
+            """ 주문의 체결확인은 1초마다 반복한다. """
+            if not self.dict_bool['모의투자']:
+                if self.buy_uuid is not None and ticker == self.buy_uuid[0] and now() > self.dict_time['매수체결확인']:
+                    self.CheckBuyChegeol(ticker)
+                    self.dict_time['매수체결확인'] = timedelta_sec(1)
+                if self.sell_uuid is not None and ticker == self.sell_uuid[0] and now() > self.dict_time['매도체결확인']:
+                    self.CheckSellChegeol(ticker)
+                    self.dict_time['매도체결확인'] = timedelta_sec(1)
+
+            """ 잔고평가 및 잔고목록 갱신도 1초마다 반복한다. """
             if now() > self.dict_time['거래정보']:
                 self.UpdateTotaljango()
                 self.dict_time['거래정보'] = timedelta_sec(1)
@@ -264,23 +267,23 @@ class Trader(QThread):
                 time.sleep(0.2)
         self.soundQ.put('잔고청산 주문을 전송하였습니다.')
 
-    def CheckChegeol(self, ticker):
-        if self.buy_uuid is not None and ticker == self.buy_uuid[0]:
-            ret = self.upbit.get_order(self.buy_uuid[1])
-            if ret is not None and ret['state'] == 'done':
-                cp = ret['price']
-                cc = ret['executed_volume']
-                self.UpdateBuy(ticker, cp, cc)
-                self.stgQ.put(['매수완료', ticker])
-                self.buy_uuid = None
-        if self.sell_uuid is not None and ticker == self.sell_uuid[0]:
-            ret = self.upbit.get_order(self.sell_uuid[1])
-            if ret is not None and ret['state'] == 'done':
-                cp = ret['price']
-                cc = ret['executed_volume']
-                self.UpdateSell(ticker, cp, cc)
-                self.stgQ.put(['매도완료', ticker])
-                self.sell_uuid = None
+    def CheckBuyChegeol(self, ticker):
+        ret = self.upbit.get_order(self.buy_uuid[1])
+        if ret is not None and ret['state'] == 'done':
+            cp = ret['price']
+            cc = ret['executed_volume']
+            self.UpdateBuy(ticker, cp, cc)
+            self.cstgQ.put(['매수완료', ticker])
+            self.buy_uuid = None
+
+    def CheckSellChegeol(self, ticker):
+        ret = self.upbit.get_order(self.sell_uuid[1])
+        if ret is not None and ret['state'] == 'done':
+            cp = ret['price']
+            cc = ret['executed_volume']
+            self.UpdateSell(ticker, cp, cc)
+            self.cstgQ.put(['매도완료', ticker])
+            self.sell_uuid = None
 
     def UpdateBuy(self, ticker, cp, cc, cancle=False):
         dt = strf_time('%Y%m%d%H%M%S%f', timedelta_hour(-9))
